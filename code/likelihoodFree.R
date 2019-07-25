@@ -1,5 +1,10 @@
 library(smfsb)
-library(Rcpp)
+
+#library(Rcpp)
+#cppFunction('NumericVector logistic(float K, float r, float x0, NumericVector t){
+#  NumericVector x = (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1.0));
+#  return x;
+#}')
 
 # pfMLLik
 # Particle filter for unbiased estimate of marginal likelihood (logged)
@@ -27,11 +32,6 @@ pfMLLik_gen = function (n, simx0, t0, stepFun, dataLik, data) {
 
 # Logistic model of population dynamics
 logistic = function(K,r,x0,t) (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1))
-
-cppFunction('float logistic(float K, float r, float x0, float t){
-  float x = (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1.0));
-  return x;
-}')
 
 # Generate and visualise synthetic observations (and "true" dynamics"
 th = c(K=1,r=1.1,x0=0.01,stdev=0.05)
@@ -62,7 +62,6 @@ thmat=matrix(0,nrow=iters,ncol=p)
 colnames(thmat)=names(th)
 # Main pMCMC loop
 for (i in 1:iters) {
-    message(paste(i,""),appendLF=FALSE)
     for (j in 1:thin) {
         thprop=th*exp(rnorm(p,0,tune))
         llprop=mLLik(thprop)
@@ -73,7 +72,6 @@ for (i in 1:iters) {
         }
     thmat[i,]=th
     }
-message("Done!")
 # Compute and plot some basic summaries
 mcmcSummary(thmat[,])
 
