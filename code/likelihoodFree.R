@@ -74,7 +74,11 @@ points(dat_dsl$x~times,pch=16,col="blue")
 stepLogistic = function(x0, t0, deltat, th) logistic(th[["K"]],th[["r"]],th[["x0"]],deltat)
 stepDSL = function(x0, t0, deltat, th){
   dsl = simDSLogistic(th[["K"]],th[["r"]],x0)
-  dsl$c[which(dsl$t>deltat)[1]]
+  if(deltat<=max(dsl$t)){
+    dsl$c[which(dsl$t>deltat)[1]]
+  }else{
+    th[["K"]]
+  }
 }
 
 simx0 = function(n, t0, th) rlnorm(n, meanlog=0,sdlog=2.5)
@@ -82,9 +86,9 @@ simx0 = function(n, t0, th) runif(n, 0, 1.5)
 simx0 = function(n, t0, th) sample(c(1,2,3,4),n,replace=TRUE)
 dataLik = function(x, t, y, th) sum(dnorm(y, x, th[["stdev"]],log=TRUE))
 
-mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat_dsl)
+#mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat_dsl)
 #mLLik = regularMLLik(dat)
-#mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
+mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
 
 priorlik = function(th){
   pK = dnorm(th[["K"]],mean=20,sd=20)
@@ -113,8 +117,8 @@ relprob = function(th){
   return(rprob)
 }
 
-nsamps = 101000
-burnin = 1000
+nsamps = 101
+burnin = 1
 ndim = 4
 
 trajectory = matrix(0, nrow=nsamps, ncol = ndim)
