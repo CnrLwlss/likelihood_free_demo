@@ -1,7 +1,7 @@
 library(MASS)
 library(parallel)
 
-set.seed(1234)
+set.seed(666)
 
 # Analytical solution of logistic model of population dynamics
 logistic = function(K,r,x0,t) (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1))
@@ -28,13 +28,12 @@ simDSLogistic=function(K,r,N0){
 pfMLLik_gen = function (n, simx0, t0, stepFun, dataLik, data) {
   times = c(t0, as.numeric(rownames(data)))
   deltas = diff(times)
-  return(function(...) {
+  return(function(th) {
     xmat = as.matrix(simx0(n, t0))
     ll = 0
     for (i in 1:length(deltas)) {
-      print(th)
-      xmat[] = apply(xmat[,drop=FALSE], 1, stepFun, t0 = times[i], deltat = deltas[i], ...)
-      lw = apply(xmat[,drop=FALSE], 1, dataLik, t = times[i + 1], y = data[i,], ...)
+      xmat[] = apply(xmat[,drop=FALSE], 1, stepFun, t0 = times[i], deltat = deltas[i], th)
+      lw = apply(xmat[,drop=FALSE], 1, dataLik, t = times[i + 1], y = data[i,], th)
       m = max(lw)
       rw = lw - m
       sw = exp(rw)
@@ -80,11 +79,12 @@ stepDSL = function(x0, t0, deltat, th){
 
 simx0 = function(n, t0, th) rlnorm(n, meanlog=0,sdlog=2.5)
 simx0 = function(n, t0, th) runif(n, 0, 1.5)
-dataLik = function(x, t, y, th) sum(dnorm(y, x, th[["stdev"]]))
+simx0 = function(n, t0, th) sample(c(1,2,3,4),n,replace=TRUE)
+dataLik = function(x, t, y, th) sum(dnorm(y, x, th[["stdev"]],log=TRUE))
 
-#mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat)
+mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat_dsl)
 #mLLik = regularMLLik(dat)
-mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
+#mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
 
 priorlik = function(th){
   pK = dnorm(th[["K"]],mean=20,sd=20)
@@ -102,7 +102,7 @@ priorlik = function(th){
   return(pK*pr*px0*pstdev)
 }
 
-failth = function(th) th[["K"]]<0|th[["r"]]<0|th[["x0"]]<0|th[["stdev"]]<0|th[["x0"]]>th[["K"]]
+failth = function(th) th[["K"]]<=0|th[["r"]]<=0|th[["x0"]]<=0|th[["stdev"]]<=0|th[["x0"]]>th[["K"]]
 
 relprob = function(th){
   if(failth(th)){
@@ -113,8 +113,8 @@ relprob = function(th){
   return(rprob)
 }
 
-nsamps = 510000
-burnin = 10000
+nsamps = 101000
+burnin = 1000
 ndim = 4
 
 trajectory = matrix(0, nrow=nsamps, ncol = ndim)
