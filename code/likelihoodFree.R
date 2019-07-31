@@ -3,7 +3,7 @@ library(parallel)
 
 set.seed(666)
 
-# Analytical solution of logistic model of population dynamics
+# Analytic solution of logistic model of population dynamics
 logistic = function(K,r,x0,t) (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1))
 
 #library(Rcpp)
@@ -117,8 +117,8 @@ relprob = function(th){
   return(rprob)
 }
 
-nsamps = 101
-burnin = 1
+nsamps = 10500
+burnin = 500
 ndim = 4
 
 trajectory = matrix(0, nrow=nsamps, ncol = ndim)
