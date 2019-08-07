@@ -72,6 +72,7 @@ plot(dsl$t,dsl$c,type="s",col="blue",lwd=2,xlab="t",ylab="x(t)",main="Synthetic 
 points(dat_dsl$x~times,pch=16,col="blue")
 
 stepLogistic = function(x0, t0, deltat, th) logistic(th[["K"]],th[["r"]],th[["x0"]],deltat)
+
 stepDSL = function(x0, t0, deltat, th){
   dsl = simDSLogistic(th[["K"]],th[["r"]],x0)
   if(deltat<=max(dsl$t)){
@@ -83,12 +84,13 @@ stepDSL = function(x0, t0, deltat, th){
 
 simx0 = function(n, t0, th) rlnorm(n, meanlog=0,sdlog=2.5)
 simx0 = function(n, t0, th) runif(n, 0, 1.5)
-simx0 = function(n, t0, th) sample(c(1,2,3,4),n,replace=TRUE)
+simx0 = function(n, t0, th) sample(1:4,n,replace=TRUE)
+
 dataLik = function(x, t, y, th) sum(dnorm(y, x, th[["stdev"]],log=TRUE))
 
-#mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat_dsl)
+mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat_dsl)
 #mLLik = regularMLLik(dat)
-mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
+#mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
 
 priorlik = function(th){
   pK = dnorm(th[["K"]],mean=20,sd=20)
@@ -153,7 +155,14 @@ traceplot = function(param,chain) {
   abline(h=th[[param]],col="red",lwd=2)
 }
 
-densplot = function(param,chain) {
+pRngs = list(
+K = c(0,60),
+r = c(0,3),
+x0 = c(0,10),
+stdev = c(0,10)
+)
+
+densplot = function(param,chain,pRngs) {
   plot(density(chain[,param]),type="l",xlab=param,main="",xlim=pRngs[[param]])
   pfunc = pfuncs[[param]]
   curve(pfunc,from=pRngs[[param]][1],to=pRngs[[param]][2],col="green",lwd=2,add=TRUE)
@@ -174,12 +183,7 @@ x0 = function(x) dunif(x,0,10),
 stdev = function(x) dunif(x,0,10)
 )
 
-pRngs = list(
-K = c(0,60),
-r = c(0,3),
-x0 = c(0,10),
-stdev = c(0,10)
-)
+
 
 op=par(mfrow=c(2,2))
 sapply(c("K","r","x0","stdev"),traceplot,thinned)
