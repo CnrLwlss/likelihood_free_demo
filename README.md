@@ -1,2 +1,2 @@
-# particle_free_demo
- Particle free inference examples
+# Likelihood free inference
+ Likelihood free inference examples
