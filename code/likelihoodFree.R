@@ -1,16 +1,16 @@
 library(MASS)
 library(parallel)
 
-set.seed(666)
-
 # Analytic solution of logistic model of population dynamics
 logistic = function(K,r,x0,t) (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1))
 
-#library(Rcpp)
-#cppFunction('NumericVector logistic(float K, float r, float x0, NumericVector t){
-#  NumericVector x = (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1.0));
-#  return x;
-#}')
+# Alternative version of analytic solution of logistic model using Rcpp (~20% faster)
+if(require(Rcpp)){
+ cppFunction('NumericVector logistic(float K, float r, float x0, NumericVector t){
+  NumericVector x = (K*x0*exp(r*t))/(K+x0*(exp(r*t)-1.0));
+  return x;
+ }')
+}
 
 # Discrete stochastic simulation of logistic model adapted from http://lwlss.net/talks/discstoch/
 simDSLogistic=function(K,r,N0){
@@ -19,6 +19,17 @@ simDSLogistic=function(K,r,N0){
   clist=(N0+1):K
   dts=-log(1-unifs)/(r*clist*(1-clist/K))
   return(data.frame(t=c(0,cumsum(dts)),c=c(N0,clist)))
+}
+
+stepLogistic = function(x0, t0, deltat, th) logistic(th[["K"]],th[["r"]],x0,deltat)
+
+stepDSL = function(x0, t0, deltat, th){
+  dsl = simDSLogistic(th[["K"]],th[["r"]],x0)
+  if(deltat<=max(dsl$t)){
+    dsl$c[which(dsl$t>deltat)[1]]
+  }else{
+    th[["K"]]
+  }
 }
 
 # pfMLLik
@@ -53,7 +64,7 @@ regularMLLik = function(dat){
 # Generate and visualise synthetic observations (and "true" dynamics) from logistic model
 th = c(K=42,r=1.1,x0=1,stdev=2.5)
 
-times = seq(0.2,7,1.5)
+times = seq(0.2,7,0.5)
 dat = data.frame(x = sapply(logistic(th[["K"]],th[["r"]],th[["x0"]],times),function(y) rnorm(1,y,th[["stdev"]])))
 rownames(dat) = times
 
@@ -71,24 +82,13 @@ rownames(dat_dsl)=times
 plot(dsl$t,dsl$c,type="s",col="blue",lwd=2,xlab="t",ylab="x(t)",main="Synthetic data from discrete stochastic logistic model",ylim=c(0,th[["K"]]))
 points(dat_dsl$x~times,pch=16,col="blue")
 
-stepLogistic = function(x0, t0, deltat, th) logistic(th[["K"]],th[["r"]],th[["x0"]],deltat)
-
-stepDSL = function(x0, t0, deltat, th){
-  dsl = simDSLogistic(th[["K"]],th[["r"]],x0)
-  if(deltat<=max(dsl$t)){
-    dsl$c[which(dsl$t>deltat)[1]]
-  }else{
-    th[["K"]]
-  }
-}
-
 simx0 = function(n, t0, th) rlnorm(n, meanlog=0,sdlog=2.5)
-simx0 = function(n, t0, th) runif(n, 0, 1.5)
-simx0 = function(n, t0, th) sample(1:4,n,replace=TRUE)
+simx0 = function(n, t0, th) runif(n, 0, 10)
+#simx0 = function(n, t0, th) sample(1:4,n,replace=TRUE)
 
 dataLik = function(x, t, y, th) sum(dnorm(y, x, th[["stdev"]],log=TRUE))
 
-mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat_dsl)
+mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat)
 #mLLik = regularMLLik(dat)
 #mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
 
@@ -190,5 +190,5 @@ sapply(c("K","r","x0","stdev"),traceplot,thinned)
 par(op)
 
 op=par(mfrow=c(2,2))
-sapply(c("K","r","x0","stdev"),densplot,thinned)
+sapply(c("K","r","x0","stdev"),densplot,thinned,pRngs)
 par(op)
