@@ -40,7 +40,8 @@ pfMLLik_gen = function (n, simx0, t0, stepFun, dataLik, data) {
   times = c(t0, as.numeric(rownames(data)))
   deltas = diff(times)
   return(function(th) {
-    xmat = as.matrix(simx0(n, t0))
+    #xmat = as.matrix(simx0(n, t0))
+    xmat = as.matrix(replicate(n,th[["x0"]]))
     ll = 0
     for (i in 1:length(deltas)) {
       xmat[] = apply(xmat[,drop=FALSE], 1, stepFun, t0 = times[i], deltat = deltas[i], th)
@@ -64,11 +65,11 @@ regularMLLik = function(dat){
 # Generate and visualise synthetic observations (and "true" dynamics) from logistic model
 th = c(K=42,r=1.1,x0=1,stdev=2.5)
 
-times = seq(0.2,7,0.5)
+times = seq(0.2,7,length.out=5)
 dat = data.frame(x = sapply(logistic(th[["K"]],th[["r"]],th[["x0"]],times),function(y) rnorm(1,y,th[["stdev"]])))
 rownames(dat) = times
 
-plot(dat$x~times,xlab="t",ylab="x(t)",main="Synthetic data from logistic model",ylim=c(0,th[["K"]]),pch=16,col="red")
+plot(dat$x~times,xlab="t",ylab="x(t)",main="Synthetic data from logistic model",ylim=c(0,max(c(th[["K"]],dat$x))),pch=16,col="red")
 newf = function(x) logistic(th[["K"]],th[["r"]],th[["x0"]],x)
 curve(newf,from=min(times),to=max(times),col="red",lwd=2,add=TRUE)
 
@@ -79,30 +80,22 @@ dsl_curve = approxfun(dsl$t,dsl$c,method="constant")
 dat_dsl = data.frame(x = sapply(dsl_curve(times),function(y) rnorm(1,y,th[["stdev"]])))
 rownames(dat_dsl)=times
 
-plot(dsl$t,dsl$c,type="s",col="blue",lwd=2,xlab="t",ylab="x(t)",main="Synthetic data from discrete stochastic logistic model",ylim=c(0,th[["K"]]))
+plot(dsl$t,dsl$c,type="s",col="blue",lwd=2,xlab="t",ylab="x(t)",main="Synthetic data from discrete stochastic logistic model",ylim=c(0,max(c(th[["K"]],dat_dsl$x))))
 points(dat_dsl$x~times,pch=16,col="blue")
 
 simx0 = function(n, t0, th) rlnorm(n, meanlog=0,sdlog=2.5)
 simx0 = function(n, t0, th) runif(n, 0, 10)
-#simx0 = function(n, t0, th) sample(1:4,n,replace=TRUE)
+simx0 = function(n, t0, th) sample(1:4,n,replace=TRUE)
 
 dataLik = function(x, t, y, th) sum(dnorm(y, x, th[["stdev"]],log=TRUE))
 
-mLLik = pfMLLik_gen(100,simx0,0,stepLogistic,dataLik,dat)
+mLLik = pfMLLik_gen(1,simx0,0,stepLogistic,dataLik,dat)
 #mLLik = regularMLLik(dat)
 #mLLik = pfMLLik_gen(100,simx0,0,stepDSL,dataLik,dat_dsl)
 
 priorlik = function(th){
   pK = dnorm(th[["K"]],mean=20,sd=20)
   pr = dnorm(th[["r"]],mean=2,sd=0.5)
-  px0 = dlnorm(th[["x0"]],meanlog=0,sdlog=1.5)
-  pstdev = dlnorm(th[["stdev"]],meanlog=0,sdlog=1)
-  return(pK*pr*px0*pstdev)
-}
-
-priorlik = function(th){
-  pK = dunif(th[["K"]],0,60)
-  pr = dunif(th[["r"]],0,5)
   px0 = dunif(th[["x0"]],0,10)
   pstdev = dunif(th[["stdev"]],0,10)
   return(pK*pr*px0*pstdev)
@@ -119,36 +112,47 @@ relprob = function(th){
   return(rprob)
 }
 
-nsamps = 10500
-burnin = 500
-ndim = 4
+nsamps = 210000
+burnin = 10000
+thin = 100
+thc = c(30,2.0,2,4)
+names(thc)=names(th)
+ndim = length(thc)
 
-trajectory = matrix(0, nrow=nsamps, ncol = ndim)
-trajectory[1,] = c(30,2.0,2,4)
+trajectory = matrix(0, nrow=nsamps/thin, ncol = ndim)
+trajectory[1,] = thc
 colnames(trajectory)=c("K","r","x0","stdev")
 
 nAccepted = 0
 nRejected = 0
 
-sd1 = 7.5; sd2 = 7.5; sd3 = 0.75; sd4 = 0.75
+sd1 = 1.3; sd2 = 0.13; sd3 = 0.13; sd4 = 0.26
 covarmat = matrix(c(sd1^2, 0,0,0,0,sd2^2,0,0,0,0,sd3^2,0,0,0,0,sd4^2), nrow=ndim, ncol=ndim)
 
+rrow = 1
 for(stepno in 1:(nsamps-1)){
-  thc = trajectory[stepno,]
+  if((stepno-1)%%thin==0){
+    trajectory[rrow,] = thc
+    rrow = rrow + 1
+  }
   proposedjump = mvrnorm(1,mu=rep(0,ndim),Sigma = covarmat)
   probaccept = min(1, relprob(thc+proposedjump)/relprob(thc))
   if(runif(1) < probaccept){
-    trajectory[stepno+1,] = thc+proposedjump
+    thc = thc+proposedjump
     if(stepno>burnin) nAccepted = nAccepted + 1
   }else{
-    trajectory[stepno+1,] = thc
+    thc = thc
     if(stepno>burnin) nRejected = nRejected + 1
   }
 }
 
-accepted = trajectory[(burnin+1):dim(trajectory)[1],]
+# Choose covarmat, aiming for acceptance ratio of about 0.2?
+sprintf("Proposals accepted %i",nAccepted)
+sprintf("Proposals rejected %i",nRejected)
+nAccepted/(nAccepted+nRejected)
 
-thinned = accepted[seq(1,dim(accepted)[1],length.out=1000),]
+pretrajectory = trajectory[1:(burnin/thin),]
+trajectory = trajectory[(burnin/thin+1):dim(trajectory)[1],]
 
 traceplot = function(param,chain) {
   plot(chain[,param],type="l",ylab=param)
@@ -172,23 +176,16 @@ densplot = function(param,chain,pRngs) {
 pfuncs = c(
 K = function(x) dnorm(x,mean=20,sd=20),
 r = function(x) dnorm(x,mean=2,sd=1.5),
-x0 = function(x) dlnorm(x,meanlog=0,sdlog=1.5),
-stdev = function(x) dlnorm(x,meanlog=0,sdlog=1)
-)
-
-pfuncs = c(
-K = function(x) dunif(x,0,60),
-r = function(x) dunif(x,0,5),
 x0 = function(x) dunif(x,0,10),
 stdev = function(x) dunif(x,0,10)
 )
 
-
-
 op=par(mfrow=c(2,2))
-sapply(c("K","r","x0","stdev"),traceplot,thinned)
+traces = sapply(c("K","r","x0","stdev"),traceplot,trajectory)
 par(op)
 
 op=par(mfrow=c(2,2))
-sapply(c("K","r","x0","stdev"),densplot,thinned,pRngs)
+denses = sapply(c("K","r","x0","stdev"),densplot,trajectory,pRngs)
 par(op)
+
+pairs(trajectory,pch=16,col=rgb(0,0,0,0.3),cex=0.5)
