@@ -82,6 +82,17 @@ rownames(dat_dsl)=times
 
 plot(dsl$t,dsl$c,type="s",col="blue",lwd=2,xlab="t",ylab="x(t)",main="Synthetic data from discrete stochastic logistic model",ylim=c(0,max(c(th[["K"]],dat_dsl$x))))
 points(dat_dsl$x~times,pch=16,col="blue")
+                                
+png("compare.png",width=1000,height=1000,pointsize=24)
+op = par(mar=c(5,5,3,3))
+plot(NULL,xlim=c(0,10),ylim=c(0,40),xlab="Time (years)",ylab="Population size",cex.axis=1.5,cex.lab=2.55,main="Simulations from logistic model & DSLM",cex.main=1.55)
+for(i in 1:500){
+  dsl = simDSLogistic(th[["K"]],th[["r"]],th[["x0"]])
+  points(dsl$t,dsl$c,col=rgb(0,0,0,0.15),lwd=2,type="s")
+}
+curve(newf,from=0,to=10,col="red",lwd=4,add=TRUE)
+par(op)
+dev.off()
 
 simx0 = function(n, t0, th) rlnorm(n, meanlog=0,sdlog=2.5)
 simx0 = function(n, t0, th) runif(n, 0, 10)
